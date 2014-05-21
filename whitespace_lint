@@ -1,0 +1,159 @@
+#!/usr/bin/env python
+
+"""\
+cleans up common whitespace messes or checks to make sure whitespace is clean.
+try --help for more details.
+"""
+
+__version__ = "1.0"
+
+import sys
+
+def main(args, in_place, check, output, newline, end_with_newline, rstrip, tabs_to_spaces_cols):
+  errors = []
+  def check_for_changes(path, line_index, original_text, new_text, message, dont_repeate_tracker=None):
+    if original_text != new_text:
+      if not (dont_repeate_tracker != None and dont_repeate_tracker[0] == True):
+        errors.append("ERROR: " + path + ":" + str(line_index+1) + ": " + message)
+      if dont_repeate_tracker != None:
+        dont_repeate_tracker[0] = True
+    return new_text
+
+  for arg in args:
+    found_bad_newlines_tracker = [False]
+    previous_errors_len = len(errors)
+
+    if arg == "-":
+      contents = sys.stdin.read()
+    else:
+      with open(arg) as f:
+        contents = f.read()
+    lines = split_into_lines(contents)
+
+    for i, line in enumerate(lines):
+      (line_without_terminator, line_terminator) = split_terminator(line)
+      if line_terminator == "":
+        # the last line doesn't end with a terminator
+        if end_with_newline:
+          line_terminator = check_for_changes(arg, i, line_terminator, newline, "no newline at end of file")
+      else:
+        if newline != None:
+          line_terminator = check_for_changes(arg, i, line_terminator, newline, "incorrect line terminator", found_bad_newlines_tracker)
+      if rstrip:
+        line_without_terminator = check_for_changes(arg, i, line_without_terminator, line_without_terminator.rstrip(), "trailing whitespace at end of line")
+      if tabs_to_spaces_cols != None:
+        line_without_terminator = check_for_changes(arg, i, line_without_terminator, tabs_to_spaces(line_without_terminator, tabs_to_spaces_cols), "hard tabs")
+      lines[i] = line_without_terminator + line_terminator
+    contents = "".join(lines)
+
+    if check:
+      continue
+    if in_place:
+      if len(errors) == previous_errors_len:
+        # nothing changed
+        continue
+      output = arg
+    if output == "-":
+      sys.stdout.write(contents)
+    else:
+      with open(arg, "w") as f:
+        f.write(contents)
+
+  if check:
+    if len(errors) > 0:
+      sys.exit("\n".join(errors))
+
+def split_into_lines(text):
+  """includes line terminators"""
+  lines = []
+  index = 0
+  while True:
+    previous_index = index
+    try:
+      index = text.index("\n", index) + 1
+    except ValueError:
+      break
+    lines.append(text[previous_index:index])
+  if index < len(text):
+    lines.append(text[index:])
+  return lines
+
+def split_terminator(line):
+  split_index = len(line)
+  try:
+    split_index = line.rindex("\n")
+    split_index = line.rindex("\r")
+  except ValueError:
+    pass
+  return (line[:split_index], line[split_index:])
+
+def tabs_to_spaces(line, cols):
+  i = 0
+  while i < len(line):
+    c = line[i]
+    if c == ' ':
+      pass
+    elif c == '\t':
+      spaces_needed = cols - i % cols
+      line = line[:i] + " " * spaces_needed + line[i+1:]
+    else:
+      break
+    i += 1
+
+  return line
+
+newline_styles = {
+  "unix": "\n",
+  "dos": "\r\n",
+}
+def cli():
+  import optparse
+  parser = optparse.OptionParser("%prog [TRANSFORMATIONS] [INPUT...] [--in_place | --check | --output OUTPUT]", version=__version__)
+
+  transformations = optparse.OptionGroup(parser, "Transformations", "if no transformations are specified, the default is: -s -e -n unix -t 8.")
+  transformations.add_option("-s", "--rstrip", action="store_true", help="delete whitepsace from the ends of lines")
+  transformations.add_option("-e", "--end_with_newline", action="store_true", help="ensure non-empty files end with a newline. requires -n.")
+  transformations.add_option("-n", "--newline", metavar="STYLE", help="convert line endings to " + repr(newline_styles))
+  transformations.add_option("-t", "--tabs_to_spaces", metavar="COLS", type=int,
+                             help="replace usage of tabs with spaces respecting mixed space/tab indentation. " +
+                                  "see https://docs.python.org/2/reference/lexical_analysis.html#indentation")
+  parser.add_option_group(transformations)
+
+  parser.add_option("-i", "--in_place", action="store_true", help="output file is the source file")
+  parser.add_option("-c", "--check", action="store_true", help="if transofmrations cause any change in the input, raise an error")
+  parser.add_option("-o", "--output", help="write output to this file. default is \"-\".")
+
+  options, args = parser.parse_args()
+  in_place = bool(options.in_place)
+  check = bool(options.check)
+  output = options.output
+  outputs_specified = sum([in_place, check, output != None])
+  if outputs_specified > 1:
+    parser.error("no more than 1 of -i, -c, -o can be specified")
+  if outputs_specified == 0:
+    output = "-"
+
+  rstrip = bool(options.rstrip)
+  end_with_newline = bool(options.end_with_newline)
+  newline = options.newline
+  if end_with_newline and newline == None:
+    parser.error("-e requires -n")
+  if newline != None:
+    try:
+      newline = newline_styles[newline]
+    except KeyError:
+      parser.error("invalid newline style: " + repr(newline))
+  tabs_to_spaces_cols = options.tabs_to_spaces
+  if sum([newline != None, end_with_newline, rstrip, tabs_to_spaces_cols != None]) == 0:
+    rstrip = True
+    end_with_newline = True
+    newline = newline_styles["unix"]
+    tabs_to_spaces_cols = 8
+
+  if args == []:
+    args = ["-"]
+
+  main(args, in_place, check, output, newline, end_with_newline, rstrip, tabs_to_spaces_cols)
+
+if __name__ == "__main__":
+  cli()

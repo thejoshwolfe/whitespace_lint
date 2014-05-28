@@ -5,7 +5,7 @@ cleans up common whitespace messes or checks to make sure whitespace is clean.
 try --help for more details.
 """
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 import sys
 
@@ -56,7 +56,7 @@ def main(args, in_place, check, output, newline, end_with_newline, rstrip, tabs_
     if output == "-":
       sys.stdout.write(contents)
     else:
-      with open(arg, "w") as f:
+      with open(output, "w") as f:
         f.write(contents)
 
   if check:

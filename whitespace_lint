@@ -5,7 +5,7 @@ cleans up common whitespace messes or checks to make sure whitespace is clean.
 try --help for more details.
 """
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 import sys
 

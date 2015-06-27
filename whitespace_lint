@@ -120,7 +120,7 @@ def cli():
   parser.add_option_group(transformations)
 
   parser.add_option("-i", "--in_place", action="store_true", help="output file is the source file")
-  parser.add_option("-c", "--check", action="store_true", help="if transofmrations cause any change in the input, raise an error")
+  parser.add_option("-c", "--check", action="store_true", help="if transformations cause any change in the input, raise an error")
   parser.add_option("-o", "--output", help="write output to this file. default is \"-\".")
 
   options, args = parser.parse_args()
